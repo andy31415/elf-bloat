@@ -110,25 +110,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "chip_size"
-version = "0.1.0"
-dependencies = [
- "clap",
- "color-eyre",
- "cpp_demangle",
- "csv",
- "elf",
- "env_logger",
- "eyre",
- "goblin",
- "log",
- "owo-colors",
- "tempfile",
- "tracing",
- "which",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -242,6 +223,25 @@ name = "elf"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4445909572dbd556c457c849c4ca58623d84b27c8fff1e74b0b4227d8b90d17b"
+
+[[package]]
+name = "elf_size"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "color-eyre",
+ "cpp_demangle",
+ "csv",
+ "elf",
+ "env_logger",
+ "eyre",
+ "goblin",
+ "log",
+ "owo-colors",
+ "tempfile",
+ "tracing",
+ "which",
+]
 
 [[package]]
 name = "env_filter"

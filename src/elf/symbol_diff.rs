@@ -1,4 +1,4 @@
-use crate::elf::symbols::{ChangeType, DiffResult, Symbol};
+use crate::elf::symbols::{ChangeType, DiffResult, Symbol, SymbolDiffReport, DiffTotals};
 use cpp_demangle;
 use csv::WriterBuilder;
 use eyre::Result;
@@ -29,7 +29,7 @@ pub fn demangle_name(name: &str) -> String {
 /// # Returns
 ///
 /// A `Result` containing the CSV formatted string or an error.
-pub fn generate_diff_csv(from_symbols: Vec<Symbol>, to_symbols: Vec<Symbol>) -> Result<String> {
+pub fn compare_symbols(from_symbols: Vec<Symbol>, to_symbols: Vec<Symbol>) -> SymbolDiffReport {
     let from_map: HashMap<String, Symbol> = from_symbols
         .into_iter()
         .map(|s| (s.name.clone(), s))
@@ -88,10 +88,22 @@ pub fn generate_diff_csv(from_symbols: Vec<Symbol>, to_symbols: Vec<Symbol>) -> 
 
     diff_results.sort_by(|a, b| a.diff.cmp(&b.diff));
 
+    SymbolDiffReport {
+        diffs: diff_results,
+        totals: DiffTotals {
+            base_size: total_base_size,
+            size: total_size,
+            diff: total_diff,
+        },
+    }
+}
+
+pub fn generate_diff_csv(report: &SymbolDiffReport) -> Result<String> {
+    
     let mut wtr = WriterBuilder::new().from_writer(vec![]);
     wtr.write_record(["Change", "Type", "Diff", "Symbol", "Base Size", "Size"])?;
 
-    for result in &diff_results {
+    for result in &report.diffs {
         wtr.write_record(&[
             result.change_type.to_string(),
             result.symbol_kind.to_string(),
@@ -106,10 +118,10 @@ pub fn generate_diff_csv(from_symbols: Vec<Symbol>, to_symbols: Vec<Symbol>) -> 
     wtr.write_record(&[
         "TOTAL".to_string(),
         "".to_string(),
-        format!("{:+}", total_diff),
+        format!("{:+}", report.totals.diff),
         "".to_string(),
-        total_base_size.to_string(),
-        total_size.to_string(),
+        report.totals.base_size.to_string(),
+        report.totals.size.to_string(),
     ])?;
 
     wtr.flush()?;
@@ -186,7 +198,8 @@ TOTAL,150,\n";
 
     #[test]
     fn test_generate_diff_csv_empty() {
-        let csv = generate_diff_csv(vec![], vec![]).unwrap();
+        let report = compare_symbols(vec![], vec![]);
+        let csv = generate_diff_csv(&report).unwrap();
         let expected = "Change,Type,Diff,Symbol,Base Size,Size
 TOTAL,,+0,,0,0
 ";
@@ -197,7 +210,8 @@ TOTAL,,+0,,0,0
     fn test_generate_diff_csv_added_removed() {
         let from = vec![create_sym("foo", SymbolKind::Code, 100)];
         let to = vec![create_sym("bar", SymbolKind::Data, 50)];
-        let csv = generate_diff_csv(from, to).unwrap();
+        let report = compare_symbols(from, to);
+        let csv = generate_diff_csv(&report).unwrap();
         let expected = "Change,Type,Diff,Symbol,Base Size,Size
 REMOVED,Code,-100,foo,100,0
 ADDED,Data,50,bar,0,50
@@ -231,7 +245,8 @@ TOTAL,,-50,,100,50
     fn test_generate_diff_csv_changed() {
         let from = vec![create_sym("foo", SymbolKind::Code, 100)];
         let to = vec![create_sym("foo", SymbolKind::Code, 150)];
-        let csv = generate_diff_csv(from, to).unwrap();
+        let report = compare_symbols(from, to);
+        let csv = generate_diff_csv(&report).unwrap();
         let expected = "Change,Type,Diff,Symbol,Base Size,Size
 CHANGED,Code,50,foo,100,150
 TOTAL,,+50,,100,150
@@ -243,7 +258,8 @@ TOTAL,,+50,,100,150
     fn test_generate_diff_csv_no_diff() {
         let from = vec![create_sym("foo", SymbolKind::Code, 100)];
         let to = vec![create_sym("foo", SymbolKind::Code, 100)];
-        let csv = generate_diff_csv(from, to).unwrap();
+        let report = compare_symbols(from, to);
+        let csv = generate_diff_csv(&report).unwrap();
         let expected = "Change,Type,Diff,Symbol,Base Size,Size
 TOTAL,,+0,,100,100
 ";
@@ -251,7 +267,7 @@ TOTAL,,+0,,100,100
     }
 
     #[test]
-    fn test_generate_diff_csv_sorting() {
+    fn test_compare_symbols_sorting() {
         let from = vec![
             create_sym("a", SymbolKind::Code, 100),
             create_sym("b", SymbolKind::Code, 100),
@@ -261,21 +277,27 @@ TOTAL,,+0,,100,100
             create_sym("b", SymbolKind::Code, 110), // Diff +10
             create_sym("c", SymbolKind::Data, 20),  // Diff +20
         ];
-        let csv = generate_diff_csv(from, to).unwrap();
-        let expected = "Change,Type,Diff,Symbol,Base Size,Size
-CHANGED,Code,-50,a,100,50
-CHANGED,Code,10,b,100,110
-ADDED,Data,20,c,0,20
-TOTAL,,-20,,200,180
-";
-        assert_eq!(csv, expected);
+        let report = compare_symbols(from, to);
+        
+        assert_eq!(report.diffs.len(), 3);
+        assert_eq!(report.diffs[0].symbol_name, "a");
+        assert_eq!(report.diffs[0].diff, -50);
+        assert_eq!(report.diffs[1].symbol_name, "b");
+        assert_eq!(report.diffs[1].diff, 10);
+        assert_eq!(report.diffs[2].symbol_name, "c");
+        assert_eq!(report.diffs[2].diff, 20);
+        
+        assert_eq!(report.totals.diff, -20);
+        assert_eq!(report.totals.base_size, 200);
+        assert_eq!(report.totals.size, 180);
     }
 
     #[test]
     fn test_generate_diff_csv_totals() {
         let from = vec![create_sym("a", SymbolKind::Code, 100)];
         let to = vec![create_sym("b", SymbolKind::Data, 30)];
-        let csv = generate_diff_csv(from, to).unwrap();
+        let report = compare_symbols(from, to);
+        let csv = generate_diff_csv(&report).unwrap();
         // Extract TOTAL line
         let total_line = csv.lines().last().unwrap();
         assert_eq!(total_line, "TOTAL,,-70,,100,30");

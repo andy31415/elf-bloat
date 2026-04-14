@@ -44,6 +44,19 @@ pub struct DiffResult {
     pub size: usize,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct DiffTotals {
+    pub base_size: usize,
+    pub size: usize,
+    pub diff: i64,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SymbolDiffReport {
+    pub diffs: Vec<DiffResult>,
+    pub totals: DiffTotals,
+}
+
 /// Type of change for a symbol.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChangeType {

@@ -2,8 +2,8 @@ use clap::{Parser, ValueEnum};
 use color_eyre::eyre::Result;
 use env_logger::Env;
 use std::path::PathBuf;
-use chip_size::elf::diff_engine::{self, DiffEngine};
-use chip_size::output::ViewerTool;
+use elf_size::elf::diff_engine::{self, DiffEngine};
+use elf_size::output::ViewerTool;
 
 /// A CLI tool for comparing ELF file symbol sizes.
 #[derive(Parser, Debug)]

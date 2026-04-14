@@ -66,21 +66,24 @@ pub fn run_diff(
             let parser = NmParser::default();
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
+            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
+            let csv_data = symbol_diff::generate_diff_csv(&report)?;
             pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
         }
         DiffEngine::Native => {
             let parser = NativeParser;
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
+            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
+            let csv_data = symbol_diff::generate_diff_csv(&report)?;
             pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
         }
         DiffEngine::Goblin => {
             let parser = GoblinParser;
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
+            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
+            let csv_data = symbol_diff::generate_diff_csv(&report)?;
             pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
         }
     }

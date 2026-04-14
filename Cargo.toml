@@ -1,10 +1,10 @@
 [package]
-name = "chip_size"
+name = "elf_size"
 version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "chip-size"
+name = "elf-size"
 path = "src/main.rs"
 
 [dependencies]
