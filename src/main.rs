@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::Result;
-use elf_size::elf::diff_engine::{self, DiffEngine};
-use elf_size::output::ViewerTool;
+use elf_bloat::elf::diff_engine::{self, DiffEngine};
+use elf_bloat::output::ViewerTool;
 use env_logger::Env;
 use std::path::PathBuf;
 

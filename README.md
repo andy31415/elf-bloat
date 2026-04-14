@@ -1,10 +1,10 @@
-# elf-size
+# elf-bloat
 
 A CLI tool and library for comparing ELF file symbol sizes.
 
 ## Overview
 
-`elf-size` helps you analyze how code changes affect binary size by comparing the symbols of two ELF files or analyzing a single ELF file. It can pipe the results to external CSV viewers like `visidata` or `csvlens` for interactive analysis.
+`elf-bloat` helps you analyze how code changes affect binary size by comparing the symbols of two ELF files or analyzing a single ELF file. It can pipe the results to external CSV viewers like `visidata` or `csvlens` for interactive analysis.
 
 ## Installation
 
@@ -18,13 +18,13 @@ Note: If `cargo` is not in PATH, it might be available at `~/.cargo/bin/cargo`.
 ### Analyze a single ELF file
 
 ```bash
-elf-size <FILE>
+elf-bloat <FILE>
 ```
 
 ### Compare an ELF file against a baseline
 
 ```bash
-elf-size <FILE> --compare-base <BASE_FILE>
+elf-bloat <FILE> --compare-base <BASE_FILE>
 ```
 
 ### Options
@@ -52,11 +52,11 @@ elf-size <FILE> --compare-base <BASE_FILE>
 
 ## As a Library
 
-You can also use `elf-size` as a library in other Rust projects. The `elf` module provides structured access to symbol data and differences.
+You can also use `elf-bloat` as a library in other Rust projects. The `elf` module provides structured access to symbol data and differences.
 
 ```rust
-use elf_size::elf::parsers::{NativeParser, ElfParser};
-use elf_size::elf::symbol_diff::compare_symbols;
+use elf_bloat::elf::parsers::{NativeParser, ElfParser};
+use elf_bloat::elf::symbol_diff::compare_symbols;
 
 let parser = NativeParser;
 let symbols1 = parser.get_symbols(path1)?;

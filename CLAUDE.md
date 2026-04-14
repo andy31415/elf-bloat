@@ -15,7 +15,7 @@ Note: If `cargo` is not in PATH, it might be available at `~/.cargo/bin/cargo`.
 
 ## Architecture
 
-`elf-size` is a Rust CLI tool and library designed to compare ELF file symbol sizes.
+`elf-bloat` is a Rust CLI tool and library designed to compare ELF file symbol sizes.
 
 ### Project Structure
 
