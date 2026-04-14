@@ -15,25 +15,26 @@ Note: If `cargo` is not in PATH, it might be available at `~/.cargo/bin/cargo`.
 
 ## Usage
 
-### Compare two ELF files
-
-```bash
-elf-size [OPTIONS] <FILE1> <FILE2>
-```
-
 ### Analyze a single ELF file
 
 ```bash
-elf-size [OPTIONS] <FILE1>
+elf-size <FILE>
+```
+
+### Compare an ELF file against a baseline
+
+```bash
+elf-size <FILE> --compare-base <BASE_FILE>
 ```
 
 ### Options
 
 | Option | Default | Description |
 |---|---|---|
-| `-w, --workdir <PATH>` | `.` | Working directory. |
-| `-d, --diff-engine <ENGINE>` | `native` | Diff engine to use: `script`, `nm`, `native`, `goblin`. |
-| `-v, --viewer <VIEWER>` | `default` | Viewer tool to use: `default`, `vd`, `visidata`, `csvlens`, `custom:<cmd>`. |
+| `--compare-base <PATH>` | | Baseline build file path for comparison. |
+| `--diff-engine <ENGINE>` | `native` | Diff engine to use: `script`, `nm`, `native`, `goblin`. |
+| `--viewer <VIEWER>` | `default` | Viewer tool to use: `default`, `vd`, `visidata`, `csvlens`, `custom:<cmd>`. |
+| `-l, --log-level <LEVEL>` | `info` | Log verbosity: `off`, `error`, `warn`, `info`, `debug`, `trace`. |
 
 ### Diff Engines
 
