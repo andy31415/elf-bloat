@@ -1,13 +1,11 @@
-use crate::elf::symbols::ElfParser;
 use crate::elf::parsers::{GoblinParser, NativeParser, NmParser};
 use crate::elf::symbol_diff;
-use crate::output::{ViewerTool, pipe_to_viewer, build_viewer_chain, CommandChain};
+use crate::elf::symbols::ElfParser;
+use crate::output::{CommandChain, ViewerTool, build_viewer_chain, pipe_to_viewer};
 use eyre::{Result, eyre};
 use log::{debug, info};
 use std::path::Path;
 use std::process::Command;
-
-
 
 /// The diff engine to use for comparison.
 #[derive(Debug, PartialEq)]
@@ -34,8 +32,6 @@ impl std::str::FromStr for DiffEngine {
         }
     }
 }
-
-
 
 /// Runs the comparison between two artifact files based on the selected engine.
 pub fn run_diff(
@@ -127,8 +123,6 @@ pub fn run_single(
     Ok(())
 }
 
-
-
 /// Executes the size difference script to compare the two artifact files.
 ///
 /// Uses `uv run` to execute `scripts/tools/binary_elf_size_diff.py`.
@@ -157,12 +151,9 @@ fn run_script_diff(
     chain.execute()
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     // ── DiffEngine parsing ────────────────────────────────────────────────────
 
@@ -180,5 +171,4 @@ mod tests {
         assert!("default".parse::<DiffEngine>().is_err());
         assert!("Native".parse::<DiffEngine>().is_err());
     }
-
 }

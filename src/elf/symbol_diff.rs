@@ -1,4 +1,4 @@
-use crate::elf::symbols::{ChangeType, DiffResult, Symbol, SymbolDiffReport, DiffTotals};
+use crate::elf::symbols::{ChangeType, DiffResult, DiffTotals, Symbol, SymbolDiffReport};
 use cpp_demangle;
 use csv::WriterBuilder;
 use eyre::Result;
@@ -99,7 +99,6 @@ pub fn compare_symbols(from_symbols: Vec<Symbol>, to_symbols: Vec<Symbol>) -> Sy
 }
 
 pub fn generate_diff_csv(report: &SymbolDiffReport) -> Result<String> {
-    
     let mut wtr = WriterBuilder::new().from_writer(vec![]);
     wtr.write_record(["Change", "Type", "Diff", "Symbol", "Base Size", "Size"])?;
 
@@ -147,11 +146,7 @@ pub fn generate_symbols_csv(symbols: Vec<Symbol>) -> Result<String> {
         ])?;
     }
 
-    wtr.write_record(&[
-        "TOTAL".to_string(),
-        total_size.to_string(),
-        "".to_string(),
-    ])?;
+    wtr.write_record(&["TOTAL".to_string(), total_size.to_string(), "".to_string()])?;
 
     wtr.flush()?;
     let data = String::from_utf8(wtr.into_inner()?)?;
@@ -278,7 +273,7 @@ TOTAL,,+0,,100,100
             create_sym("c", SymbolKind::Data, 20),  // Diff +20
         ];
         let report = compare_symbols(from, to);
-        
+
         assert_eq!(report.diffs.len(), 3);
         assert_eq!(report.diffs[0].symbol_name, "a");
         assert_eq!(report.diffs[0].diff, -50);
@@ -286,7 +281,7 @@ TOTAL,,+0,,100,100
         assert_eq!(report.diffs[1].diff, 10);
         assert_eq!(report.diffs[2].symbol_name, "c");
         assert_eq!(report.diffs[2].diff, 20);
-        
+
         assert_eq!(report.totals.diff, -20);
         assert_eq!(report.totals.base_size, 200);
         assert_eq!(report.totals.size, 180);

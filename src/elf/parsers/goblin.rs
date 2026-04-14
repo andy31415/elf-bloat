@@ -1,7 +1,7 @@
 //! ELF symbol parser using the `goblin` crate.
 
-use crate::elf::symbols::{ElfParser, Symbol, SymbolKind};
 use crate::elf::symbol_diff::demangle_name;
+use crate::elf::symbols::{ElfParser, Symbol, SymbolKind};
 use eyre::{Result, WrapErr, eyre};
 use goblin::elf;
 use goblin::elf::sym;

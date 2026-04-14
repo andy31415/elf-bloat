@@ -1,6 +1,6 @@
-use eyre::{Result, eyre, WrapErr};
+use eyre::{Result, WrapErr, eyre};
 use std::path::Path;
-use std::process::{Command, Child, Stdio};
+use std::process::{Child, Command, Stdio};
 use which::which;
 
 /// Columns shown by default in csvlens. Omits `Size1`/`Size2` which are rarely

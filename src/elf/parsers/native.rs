@@ -1,7 +1,7 @@
 //! ELF symbol parser using the `elf` crate.
 
-use crate::elf::symbols::{ElfParser, Symbol, SymbolKind};
 use crate::elf::symbol_diff::demangle_name;
+use crate::elf::symbols::{ElfParser, Symbol, SymbolKind};
 use elf::ElfBytes;
 use elf::abi;
 use elf::endian::AnyEndian;

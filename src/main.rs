@@ -1,9 +1,9 @@
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::Result;
-use env_logger::Env;
-use std::path::PathBuf;
 use elf_size::elf::diff_engine::{self, DiffEngine};
 use elf_size::output::ViewerTool;
+use env_logger::Env;
+use std::path::PathBuf;
 
 /// A CLI tool for comparing ELF file symbol sizes.
 #[derive(Parser, Debug)]
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
 
     let viewer: ViewerTool = cli.viewer.parse()?;
     let diff_engine: DiffEngine = cli.diff_engine.parse()?;
-    
+
     let workdir = std::env::current_dir()?;
 
     if let Some(base) = cli.compare_base {
@@ -79,12 +79,7 @@ fn main() -> Result<()> {
             &viewer,
         )?;
     } else {
-        diff_engine::run_single(
-            &PathBuf::from(&cli.file),
-            &workdir,
-            &diff_engine,
-            &viewer,
-        )?;
+        diff_engine::run_single(&PathBuf::from(&cli.file), &workdir, &diff_engine, &viewer)?;
     }
 
     Ok(())
