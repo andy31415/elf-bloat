@@ -1,57 +1,14 @@
-use crate::runner::elf_diff::ElfParser;
-use crate::runner::parsers::{GoblinParser, NativeParser, NmParser};
-use crate::runner::process::CommandChain;
-use crate::runner::symbol_diff;
-use eyre::{Result, eyre};
-use log::{debug, info};
+use eyre::{Result, eyre, WrapErr};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Child, Stdio};
 use which::which;
 
 /// Columns shown by default in csvlens. Omits `Size1`/`Size2` which are rarely
 /// useful and waste horizontal space; `Function`, `Type`, and `Size` cover most
 /// review workflows.
-const CSVLENS_DEFAULT_COLUMNS: &str = "Function|Size$|Type";
-
-/// The diff engine to use for comparison.
-#[derive(Debug, PartialEq)]
-pub enum DiffEngine {
-    Script,
-    Nm,
-    Native,
-    Goblin,
-}
-
-impl std::str::FromStr for DiffEngine {
-    type Err = eyre::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "script" => Ok(Self::Script),
-            "nm" => Ok(Self::Nm),
-            "native" => Ok(Self::Native),
-            "goblin" => Ok(Self::Goblin),
-            other => Err(eyre!(
-                "Unknown diff engine '{}'. Valid options: script, nm, native, goblin",
-                other
-            )),
-        }
-    }
-}
+pub const CSVLENS_DEFAULT_COLUMNS: &str = "Function|Size$|Type";
 
 /// The viewer tool to pipe CSV output to.
-///
-/// Implements [`std::str::FromStr`], so it can be parsed with `.parse()` or
-/// `ViewerTool::from_str()`.
-///
-/// # Examples
-///
-/// ```
-/// use chip_size::runner::diff_engine::ViewerTool;
-/// assert!("csvlens".parse::<ViewerTool>().is_ok());
-/// assert!("custom:grep chip".parse::<ViewerTool>().is_ok());
-/// assert!("unknown".parse::<ViewerTool>().is_err());
-/// ```
 #[derive(Debug, PartialEq)]
 pub enum ViewerTool {
     /// Auto-detect: prefer `vd`, then `csvlens`, then plain table output.
@@ -65,10 +22,6 @@ pub enum ViewerTool {
 impl std::str::FromStr for ViewerTool {
     type Err = eyre::Error;
 
-    /// Parses a viewer name string into a `ViewerTool`.
-    ///
-    /// Valid values: `default`, `vd`, `visidata`, `csvlens`, `custom:<cmd>`.
-    /// For `custom`, arguments are supported: `custom:grep chip` → `grep` with arg `chip`.
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "default" => Ok(Self::Default),
@@ -95,7 +48,7 @@ impl std::str::FromStr for ViewerTool {
 
 impl ViewerTool {
     /// Resolve `Default` to a concrete choice based on what is installed.
-    fn resolve(&self) -> ResolvedViewer {
+    pub fn resolve(&self) -> ResolvedViewer {
         match self {
             Self::Default => {
                 if which("vd").is_ok() {
@@ -114,101 +67,14 @@ impl ViewerTool {
 }
 
 #[derive(Debug, PartialEq)]
-enum ResolvedViewer {
+pub enum ResolvedViewer {
     Table,
     Visidata,
     Csvlens,
     Custom(Vec<String>),
 }
 
-/// Runs the comparison between two artifact files based on the selected engine.
-pub fn run_diff(
-    from_path: &Path,
-    to_path: &Path,
-    workdir: &Path,
-    diff_engine: &DiffEngine,
-    extra_args: &[String],
-    viewer: &ViewerTool,
-) -> Result<()> {
-    if !from_path.exists() {
-        return Err(eyre!("From file not found: {}", from_path.display()));
-    }
-    if !to_path.exists() {
-        return Err(eyre!("To file not found: {}", to_path.display()));
-    }
-
-    info!(
-        "Comparing {} and {} using {:?}",
-        from_path.display(),
-        to_path.display(),
-        diff_engine
-    );
-
-    match diff_engine {
-        DiffEngine::Script => run_script_diff(from_path, to_path, workdir, extra_args, viewer)?,
-        DiffEngine::Nm => {
-            let parser = NmParser::default();
-            let from_symbols = parser.get_symbols(from_path)?;
-            let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
-        }
-        DiffEngine::Native => {
-            let parser = NativeParser;
-            let from_symbols = parser.get_symbols(from_path)?;
-            let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
-        }
-        DiffEngine::Goblin => {
-            let parser = GoblinParser;
-            let from_symbols = parser.get_symbols(from_path)?;
-            let to_symbols = parser.get_symbols(to_path)?;
-            let csv_data = symbol_diff::generate_diff_csv(from_symbols, to_symbols)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
-        }
-    }
-    Ok(())
-}
-
-/// Runs the symbol size analysis for a single artifact file.
-pub fn run_single(
-    path: &Path,
-    workdir: &Path,
-    diff_engine: &DiffEngine,
-    viewer: &ViewerTool,
-) -> Result<()> {
-    if !path.exists() {
-        return Err(eyre!("File not found: {}", path.display()));
-    }
-
-    info!("Analyzing {} using {:?}", path.display(), diff_engine);
-
-    let symbols = match diff_engine {
-        DiffEngine::Script => {
-            return Err(eyre!("Script engine does not support single file analysis"));
-        }
-        DiffEngine::Nm => {
-            let parser = NmParser::default();
-            parser.get_symbols(path)?
-        }
-        DiffEngine::Native => {
-            let parser = NativeParser;
-            parser.get_symbols(path)?
-        }
-        DiffEngine::Goblin => {
-            let parser = GoblinParser;
-            parser.get_symbols(path)?
-        }
-    };
-
-    let csv_data = symbol_diff::generate_symbols_csv(symbols)?;
-    pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
-
-    Ok(())
-}
-
-fn pipe_to_viewer(input: &[u8], workdir: &Path, viewer: &ViewerTool) -> Result<()> {
+pub fn pipe_to_viewer(input: &[u8], workdir: &Path, viewer: &ViewerTool) -> Result<()> {
     let resolved = viewer.resolve();
     let command = match resolved {
         ResolvedViewer::Visidata => {
@@ -228,7 +94,6 @@ fn pipe_to_viewer(input: &[u8], workdir: &Path, viewer: &ViewerTool) -> Result<(
             Some(cmd)
         }
         ResolvedViewer::Table => {
-            // For table view, we just print the input directly
             println!("{}", String::from_utf8_lossy(input));
             return Ok(());
         }
@@ -257,37 +122,65 @@ STDERR: {}",
     }
 }
 
-/// Executes the size difference script to compare the two artifact files.
-///
-/// Uses `uv run` to execute `scripts/tools/binary_elf_size_diff.py`.
-fn run_script_diff(
-    from_path: &Path,
-    to_path: &Path,
-    workdir: &Path,
-    extra_args: &[String],
-    viewer: &ViewerTool,
-) -> Result<()> {
-    let mut diff_cmd = Command::new("uv");
-    diff_cmd
-        .args(["run", "scripts/tools/binary_elf_size_diff.py"])
-        .current_dir(workdir);
-
-    // Build the full diff command (including output format and positional paths)
-    // before constructing the chain so the chain's first command is immutable
-    // once created.
-    let chain = if extra_args.is_empty() {
-        build_viewer_chain(diff_cmd, from_path, to_path, workdir, viewer)
-    } else {
-        diff_cmd.args(extra_args).arg(to_path).arg(from_path);
-        CommandChain::new(diff_cmd)
-    };
-    debug!("Executing: {:?}", chain);
-    chain.execute()
+/// A chain of commands piped together: stdout of each feeds stdin of the next.
+#[derive(Debug)]
+pub struct CommandChain {
+    commands: Vec<Command>,
 }
 
-/// Finalises the diff command with the correct `--output` flag and paths, then
-/// wraps it in a `CommandChain` with the appropriate viewer piped on the end.
-fn build_viewer_chain(
+impl CommandChain {
+    pub fn new(initial_command: Command) -> Self {
+        CommandChain {
+            commands: vec![initial_command],
+        }
+    }
+
+    pub fn pipe(mut self, command: Command) -> Self {
+        self.commands.push(command);
+        self
+    }
+
+    pub fn execute(mut self) -> Result<()> {
+        let n = self.commands.len();
+        if n == 0 {
+            return Ok(());
+        }
+
+        let mut previous_child: Option<Child> = None;
+        let mut intermediate_children: Vec<Child> = Vec::new();
+
+        for (i, command) in self.commands.iter_mut().enumerate() {
+            if let Some(mut child) = previous_child.take() {
+                command.stdin(Stdio::from(child.stdout.take().unwrap()));
+                intermediate_children.push(child);
+            }
+
+            if i == n - 1 {
+                command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+                let status = command.status().wrap_err("Failed to execute command")?;
+                if !status.success() {
+                    return Err(eyre!("Command failed with status: {}", status));
+                }
+            } else {
+                command.stdout(Stdio::piped()).stderr(Stdio::inherit());
+                previous_child = Some(command.spawn().wrap_err("Failed to start command")?);
+            }
+        }
+
+        for mut child in intermediate_children {
+            let status = child
+                .wait()
+                .wrap_err("Failed to wait on intermediate command")?;
+            if !status.success() {
+                return Err(eyre!("Intermediate command failed with status: {}", status));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub fn build_viewer_chain(
     mut diff_cmd: Command,
     from_path: &Path,
     to_path: &Path,
@@ -331,8 +224,6 @@ fn build_viewer_chain(
 mod tests {
     use super::*;
 
-    // ── FromStr parsing ───────────────────────────────────────────────────────
-
     #[test]
     fn test_parse_known_variants() {
         assert_eq!(
@@ -360,7 +251,6 @@ mod tests {
 
     #[test]
     fn test_parse_custom_multi_arg() {
-        // Simulates --viewer custom:"grep chip" after shell quote stripping.
         assert_eq!(
             "custom:grep chip".parse::<ViewerTool>().unwrap(),
             ViewerTool::Custom(vec!["grep".to_string(), "chip".to_string()]),
@@ -389,27 +279,8 @@ mod tests {
     fn test_parse_unknown_is_error() {
         assert!("".parse::<ViewerTool>().is_err());
         assert!("foobar".parse::<ViewerTool>().is_err());
-        assert!("Custom:foo".parse::<ViewerTool>().is_err()); // case-sensitive
+        assert!("Custom:foo".parse::<ViewerTool>().is_err());
     }
-
-    // ── DiffEngine parsing ────────────────────────────────────────────────────
-
-    #[test]
-    fn test_parse_diff_engine_known() {
-        assert_eq!("script".parse::<DiffEngine>().unwrap(), DiffEngine::Script);
-        assert_eq!("nm".parse::<DiffEngine>().unwrap(), DiffEngine::Nm);
-        assert_eq!("native".parse::<DiffEngine>().unwrap(), DiffEngine::Native);
-        assert_eq!("goblin".parse::<DiffEngine>().unwrap(), DiffEngine::Goblin);
-    }
-
-    #[test]
-    fn test_parse_diff_engine_unknown() {
-        assert!("".parse::<DiffEngine>().is_err());
-        assert!("default".parse::<DiffEngine>().is_err());
-        assert!("Native".parse::<DiffEngine>().is_err());
-    }
-
-    // ── resolve (deterministic variants only) ─────────────────────────────────
 
     #[test]
     fn test_resolve_visidata() {
@@ -432,8 +303,6 @@ mod tests {
 
     #[test]
     fn test_resolve_default_returns_valid_variant() {
-        // We can't know which tool is installed in CI, but the result must be
-        // one of the three valid fallback variants.
         let resolved = ViewerTool::Default.resolve();
         assert!(matches!(
             resolved,

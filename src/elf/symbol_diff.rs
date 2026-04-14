@@ -1,4 +1,4 @@
-use crate::runner::elf_diff::{ChangeType, DiffResult, Symbol};
+use crate::elf::symbols::{ChangeType, DiffResult, Symbol};
 use cpp_demangle;
 use csv::WriterBuilder;
 use eyre::Result;
@@ -149,7 +149,7 @@ pub fn generate_symbols_csv(symbols: Vec<Symbol>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runner::elf_diff::SymbolKind;
+    use crate::elf::symbols::SymbolKind;
 
     fn create_sym(name: &str, kind: SymbolKind, size: usize) -> Symbol {
         Symbol {
