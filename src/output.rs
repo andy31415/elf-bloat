@@ -1,6 +1,6 @@
-use eyre::{Result, WrapErr, eyre};
+use eyre::{Result, eyre};
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use which::which;
 
 /// Columns shown by default in csvlens. Omits `Size1`/`Size2` which are rarely
@@ -15,6 +15,8 @@ pub enum ViewerTool {
     Default,
     Visidata,
     Csvlens,
+    /// Just output CSV to stdout.
+    None,
     /// Pipe to an arbitrary program (with optional args) that reads CSV from stdin.
     Custom(Vec<String>),
 }
@@ -27,6 +29,7 @@ impl std::str::FromStr for ViewerTool {
             "default" => Ok(Self::Default),
             "vd" | "visidata" => Ok(Self::Visidata),
             "csvlens" => Ok(Self::Csvlens),
+            "none" => Ok(Self::None),
             s if s.starts_with("custom:") => {
                 let rest = s.trim_start_matches("custom:");
                 let parts: Vec<String> = rest.split_whitespace().map(str::to_string).collect();
@@ -61,6 +64,7 @@ impl ViewerTool {
             }
             Self::Visidata => ResolvedViewer::Visidata,
             Self::Csvlens => ResolvedViewer::Csvlens,
+            Self::None => ResolvedViewer::Csv,
             Self::Custom(parts) => ResolvedViewer::Custom(parts.clone()),
         }
     }
@@ -69,6 +73,7 @@ impl ViewerTool {
 #[derive(Debug, PartialEq)]
 pub enum ResolvedViewer {
     Table,
+    Csv,
     Visidata,
     Csvlens,
     Custom(Vec<String>),
@@ -93,7 +98,7 @@ pub fn pipe_to_viewer(input: &[u8], workdir: &Path, viewer: &ViewerTool) -> Resu
             cmd.args(&parts[1..]).current_dir(workdir);
             Some(cmd)
         }
-        ResolvedViewer::Table => {
+        ResolvedViewer::Table | ResolvedViewer::Csv => {
             println!("{}", String::from_utf8_lossy(input));
             return Ok(());
         }
@@ -122,103 +127,7 @@ STDERR: {}",
     }
 }
 
-/// A chain of commands piped together: stdout of each feeds stdin of the next.
-#[derive(Debug)]
-pub struct CommandChain {
-    commands: Vec<Command>,
-}
 
-impl CommandChain {
-    pub fn new(initial_command: Command) -> Self {
-        CommandChain {
-            commands: vec![initial_command],
-        }
-    }
-
-    pub fn pipe(mut self, command: Command) -> Self {
-        self.commands.push(command);
-        self
-    }
-
-    pub fn execute(mut self) -> Result<()> {
-        let n = self.commands.len();
-        if n == 0 {
-            return Ok(());
-        }
-
-        let mut previous_child: Option<Child> = None;
-        let mut intermediate_children: Vec<Child> = Vec::new();
-
-        for (i, command) in self.commands.iter_mut().enumerate() {
-            if let Some(mut child) = previous_child.take() {
-                command.stdin(Stdio::from(child.stdout.take().unwrap()));
-                intermediate_children.push(child);
-            }
-
-            if i == n - 1 {
-                command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
-                let status = command.status().wrap_err("Failed to execute command")?;
-                if !status.success() {
-                    return Err(eyre!("Command failed with status: {}", status));
-                }
-            } else {
-                command.stdout(Stdio::piped()).stderr(Stdio::inherit());
-                previous_child = Some(command.spawn().wrap_err("Failed to start command")?);
-            }
-        }
-
-        for mut child in intermediate_children {
-            let status = child
-                .wait()
-                .wrap_err("Failed to wait on intermediate command")?;
-            if !status.success() {
-                return Err(eyre!("Intermediate command failed with status: {}", status));
-            }
-        }
-
-        Ok(())
-    }
-}
-
-pub fn build_viewer_chain(
-    mut diff_cmd: Command,
-    from_path: &Path,
-    to_path: &Path,
-    workdir: &Path,
-    viewer: &ViewerTool,
-) -> CommandChain {
-    let resolved = viewer.resolve();
-    let output_format = if matches!(resolved, ResolvedViewer::Table) {
-        "table"
-    } else {
-        "csv"
-    };
-    diff_cmd
-        .args(["--output", output_format])
-        .arg(to_path)
-        .arg(from_path);
-
-    match resolved {
-        ResolvedViewer::Visidata => {
-            let mut vd = Command::new("vd");
-            vd.current_dir(workdir).arg("-");
-            CommandChain::new(diff_cmd).pipe(vd)
-        }
-        ResolvedViewer::Csvlens => {
-            let mut csvlens = Command::new("csvlens");
-            csvlens
-                .current_dir(workdir)
-                .args(["--columns", CSVLENS_DEFAULT_COLUMNS]);
-            CommandChain::new(diff_cmd).pipe(csvlens)
-        }
-        ResolvedViewer::Custom(parts) => {
-            let mut custom = Command::new(&parts[0]);
-            custom.args(&parts[1..]).current_dir(workdir);
-            CommandChain::new(diff_cmd).pipe(custom)
-        }
-        ResolvedViewer::Table => CommandChain::new(diff_cmd),
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -238,6 +147,10 @@ mod tests {
         assert_eq!(
             "csvlens".parse::<ViewerTool>().unwrap(),
             ViewerTool::Csvlens
+        );
+        assert_eq!(
+            "none".parse::<ViewerTool>().unwrap(),
+            ViewerTool::None
         );
     }
 
@@ -290,6 +203,11 @@ mod tests {
     #[test]
     fn test_resolve_csvlens() {
         assert_eq!(ViewerTool::Csvlens.resolve(), ResolvedViewer::Csvlens);
+    }
+
+    #[test]
+    fn test_resolve_none() {
+        assert_eq!(ViewerTool::None.resolve(), ResolvedViewer::Csv);
     }
 
     #[test]

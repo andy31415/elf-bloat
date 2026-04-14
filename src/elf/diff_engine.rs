@@ -1,16 +1,14 @@
 use crate::elf::parsers::{GoblinParser, NativeParser, NmParser};
 use crate::elf::symbol_diff;
 use crate::elf::symbols::ElfParser;
-use crate::output::{CommandChain, ViewerTool, build_viewer_chain, pipe_to_viewer};
+use crate::output::{ViewerTool, pipe_to_viewer};
 use eyre::{Result, eyre};
-use log::{debug, info};
+use log::info;
 use std::path::Path;
-use std::process::Command;
 
 /// The diff engine to use for comparison.
 #[derive(Debug, PartialEq)]
 pub enum DiffEngine {
-    Script,
     Nm,
     Native,
     Goblin,
@@ -21,12 +19,11 @@ impl std::str::FromStr for DiffEngine {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "script" => Ok(Self::Script),
             "nm" => Ok(Self::Nm),
             "native" => Ok(Self::Native),
             "goblin" => Ok(Self::Goblin),
             other => Err(eyre!(
-                "Unknown diff engine '{}'. Valid options: script, nm, native, goblin",
+                "Unknown diff engine '{}'. Valid options: nm, native, goblin",
                 other
             )),
         }
@@ -39,7 +36,6 @@ pub fn run_diff(
     to_path: &Path,
     workdir: &Path,
     diff_engine: &DiffEngine,
-    extra_args: &[String],
     viewer: &ViewerTool,
 ) -> Result<()> {
     if !from_path.exists() {
@@ -57,7 +53,6 @@ pub fn run_diff(
     );
 
     match diff_engine {
-        DiffEngine::Script => run_script_diff(from_path, to_path, workdir, extra_args, viewer)?,
         DiffEngine::Nm => {
             let parser = NmParser::default();
             let from_symbols = parser.get_symbols(from_path)?;
@@ -100,9 +95,6 @@ pub fn run_single(
     info!("Analyzing {} using {:?}", path.display(), diff_engine);
 
     let symbols = match diff_engine {
-        DiffEngine::Script => {
-            return Err(eyre!("Script engine does not support single file analysis"));
-        }
         DiffEngine::Nm => {
             let parser = NmParser::default();
             parser.get_symbols(path)?
@@ -123,33 +115,7 @@ pub fn run_single(
     Ok(())
 }
 
-/// Executes the size difference script to compare the two artifact files.
-///
-/// Uses `uv run` to execute `scripts/tools/binary_elf_size_diff.py`.
-fn run_script_diff(
-    from_path: &Path,
-    to_path: &Path,
-    workdir: &Path,
-    extra_args: &[String],
-    viewer: &ViewerTool,
-) -> Result<()> {
-    let mut diff_cmd = Command::new("uv");
-    diff_cmd
-        .args(["run", "scripts/tools/binary_elf_size_diff.py"])
-        .current_dir(workdir);
 
-    // Build the full diff command (including output format and positional paths)
-    // before constructing the chain so the chain's first command is immutable
-    // once created.
-    let chain = if extra_args.is_empty() {
-        build_viewer_chain(diff_cmd, from_path, to_path, workdir, viewer)
-    } else {
-        diff_cmd.args(extra_args).arg(to_path).arg(from_path);
-        CommandChain::new(diff_cmd)
-    };
-    debug!("Executing: {:?}", chain);
-    chain.execute()
-}
 
 #[cfg(test)]
 mod tests {
@@ -159,7 +125,6 @@ mod tests {
 
     #[test]
     fn test_parse_diff_engine_known() {
-        assert_eq!("script".parse::<DiffEngine>().unwrap(), DiffEngine::Script);
         assert_eq!("nm".parse::<DiffEngine>().unwrap(), DiffEngine::Nm);
         assert_eq!("native".parse::<DiffEngine>().unwrap(), DiffEngine::Native);
         assert_eq!("goblin".parse::<DiffEngine>().unwrap(), DiffEngine::Goblin);

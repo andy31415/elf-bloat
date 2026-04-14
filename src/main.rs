@@ -17,12 +17,12 @@ struct Cli {
     compare_base: Option<String>,
 
     /// Viewer tool to pipe CSV output to.
-    /// Options: default, vd, visidata, csvlens, custom:<name>
+    /// Options: default, vd, visidata, csvlens, none, custom:<name>
     #[arg(long, default_value = "default")]
     viewer: String,
 
     /// Diff engine to use for comparison.
-    /// Options: script, nm, native, goblin
+    /// Options: nm, native, goblin
     #[arg(long, default_value = "native")]
     diff_engine: String,
 
@@ -75,7 +75,6 @@ fn main() -> Result<()> {
             &PathBuf::from(&cli.file),
             &workdir,
             &diff_engine,
-            &[],
             &viewer,
         )?;
     } else {
