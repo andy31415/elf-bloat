@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 use color_eyre::eyre::Result;
 use elf_bloat::elf::diff_engine::{self, DiffEngine};
-use elf_bloat::output::ViewerTool;
+use elf_bloat::output::{ViewerTool, display_diff, display_symbols};
 use env_logger::Env;
 use std::path::PathBuf;
 
@@ -70,15 +70,15 @@ fn main() -> Result<()> {
     let workdir = std::env::current_dir()?;
 
     if let Some(base) = cli.compare_base {
-        diff_engine::run_diff(
+        let report = diff_engine::run_diff(
             &PathBuf::from(&base),
             &PathBuf::from(&cli.file),
-            &workdir,
             &diff_engine,
-            &viewer,
         )?;
+        display_diff(&report, &workdir, &viewer)?;
     } else {
-        diff_engine::run_single(&PathBuf::from(&cli.file), &workdir, &diff_engine, &viewer)?;
+        let symbols = diff_engine::run_single(&PathBuf::from(&cli.file), &diff_engine)?;
+        display_symbols(symbols, &workdir, &viewer)?;
     }
 
     Ok(())

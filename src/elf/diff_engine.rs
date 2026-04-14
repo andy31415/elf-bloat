@@ -1,7 +1,6 @@
 use crate::elf::parsers::{GoblinParser, NativeParser, NmParser};
 use crate::elf::symbol_diff;
-use crate::elf::symbols::ElfParser;
-use crate::output::{ViewerTool, pipe_to_viewer};
+use crate::elf::symbols::{ElfParser, Symbol, SymbolDiffReport};
 use eyre::{Result, eyre};
 use log::info;
 use std::path::Path;
@@ -34,10 +33,8 @@ impl std::str::FromStr for DiffEngine {
 pub fn run_diff(
     from_path: &Path,
     to_path: &Path,
-    workdir: &Path,
     diff_engine: &DiffEngine,
-    viewer: &ViewerTool,
-) -> Result<()> {
+) -> Result<SymbolDiffReport> {
     if !from_path.exists() {
         return Err(eyre!("From file not found: {}", from_path.display()));
     }
@@ -52,42 +49,34 @@ pub fn run_diff(
         diff_engine
     );
 
-    match diff_engine {
+    let report = match diff_engine {
         DiffEngine::Nm => {
             let parser = NmParser::default();
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
-            let csv_data = symbol_diff::generate_diff_csv(&report)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
+            symbol_diff::compare_symbols(from_symbols, to_symbols)
         }
         DiffEngine::Native => {
             let parser = NativeParser;
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
-            let csv_data = symbol_diff::generate_diff_csv(&report)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
+            symbol_diff::compare_symbols(from_symbols, to_symbols)
         }
         DiffEngine::Goblin => {
             let parser = GoblinParser;
             let from_symbols = parser.get_symbols(from_path)?;
             let to_symbols = parser.get_symbols(to_path)?;
-            let report = symbol_diff::compare_symbols(from_symbols, to_symbols);
-            let csv_data = symbol_diff::generate_diff_csv(&report)?;
-            pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
+            symbol_diff::compare_symbols(from_symbols, to_symbols)
         }
-    }
-    Ok(())
+    };
+    Ok(report)
 }
 
 /// Runs the symbol size analysis for a single artifact file.
 pub fn run_single(
     path: &Path,
-    workdir: &Path,
     diff_engine: &DiffEngine,
-    viewer: &ViewerTool,
-) -> Result<()> {
+) -> Result<Vec<Symbol>> {
     if !path.exists() {
         return Err(eyre!("File not found: {}", path.display()));
     }
@@ -109,10 +98,7 @@ pub fn run_single(
         }
     };
 
-    let csv_data = symbol_diff::generate_symbols_csv(symbols)?;
-    pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
-
-    Ok(())
+    Ok(symbols)
 }
 
 

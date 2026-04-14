@@ -2,6 +2,8 @@ use eyre::{Result, eyre};
 use std::path::Path;
 use std::process::Command;
 use which::which;
+use crate::elf::symbols::{Symbol, SymbolDiffReport};
+use crate::elf::symbol_diff;
 
 /// Columns shown by default in csvlens. Omits `Size1`/`Size2` which are rarely
 /// useful and waste horizontal space; `Function`, `Type`, and `Size` cover most
@@ -127,7 +129,17 @@ STDERR: {}",
     }
 }
 
+pub fn display_diff(report: &SymbolDiffReport, workdir: &Path, viewer: &ViewerTool) -> Result<()> {
+    let csv_data = symbol_diff::generate_diff_csv(report)?;
+    pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
+    Ok(())
+}
 
+pub fn display_symbols(symbols: Vec<Symbol>, workdir: &Path, viewer: &ViewerTool) -> Result<()> {
+    let csv_data = symbol_diff::generate_symbols_csv(symbols)?;
+    pipe_to_viewer(csv_data.as_bytes(), workdir, viewer)?;
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
