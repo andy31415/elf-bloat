@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 pub fn demangle_name(name: &str) -> String {
     match cpp_demangle::Symbol::new(name.as_bytes()) {
-        Ok(symbol) => symbol.to_string(),
+        Ok(symbol) => symbol.demangle().unwrap_or_else(|_| name.to_string()),
         Err(_) => name.to_string(),
     }
 }

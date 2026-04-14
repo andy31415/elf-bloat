@@ -14,18 +14,17 @@ name = "elf-bloat"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 color-eyre = "0.6.5"
-cpp_demangle = "0.4"
-csv = "1.3"
-env_logger = "0.11.3"
+cpp_demangle = "0.5.1"
+csv = "1.4.0"
+env_logger = "0.11.10"
 eyre = "0.6.12"
-elf = "0.7"
+elf = "0.8.0"
 goblin = "0.10.5"
-log = "0.4.21"
-owo-colors = "4.3.0"
-tracing = "0.1"
-which = "6.0"
+log = "0.4.29"
+tracing = "0.1.44"
+which = "8.0.2"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.27.0"
