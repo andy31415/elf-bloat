@@ -73,10 +73,7 @@ pub fn run_diff(
 }
 
 /// Runs the symbol size analysis for a single artifact file.
-pub fn run_single(
-    path: &Path,
-    diff_engine: &DiffEngine,
-) -> Result<Vec<Symbol>> {
+pub fn run_single(path: &Path, diff_engine: &DiffEngine) -> Result<Vec<Symbol>> {
     if !path.exists() {
         return Err(eyre!("File not found: {}", path.display()));
     }
@@ -100,8 +97,6 @@ pub fn run_single(
 
     Ok(symbols)
 }
-
-
 
 #[cfg(test)]
 mod tests {

@@ -1,9 +1,9 @@
+use crate::elf::symbol_diff;
+use crate::elf::symbols::{Symbol, SymbolDiffReport};
 use eyre::{Result, eyre};
 use std::path::Path;
 use std::process::Command;
 use which::which;
-use crate::elf::symbols::{Symbol, SymbolDiffReport};
-use crate::elf::symbol_diff;
 
 /// Columns shown by default in csvlens. Omits `Size1`/`Size2` which are rarely
 /// useful and waste horizontal space; `Function`, `Type`, and `Size` cover most
@@ -160,10 +160,7 @@ mod tests {
             "csvlens".parse::<ViewerTool>().unwrap(),
             ViewerTool::Csvlens
         );
-        assert_eq!(
-            "none".parse::<ViewerTool>().unwrap(),
-            ViewerTool::None
-        );
+        assert_eq!("none".parse::<ViewerTool>().unwrap(), ViewerTool::None);
     }
 
     #[test]
